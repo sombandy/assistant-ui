@@ -6,6 +6,7 @@ import { oneLight, oneDark } from "react-syntax-highlighter/dist/cjs/styles/pris
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { marked } from "marked";
+import { format as sqlFormat } from "sql-formatter";
 
 export const ToolFallback: ToolCallContentPartComponent = ({
   toolName,
@@ -47,15 +48,34 @@ export const ToolFallback: ToolCallContentPartComponent = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // State for copy button
   const [copied, setCopied] = useState(false);
 
-  // Format SQL query for sql_db_query tool
+  const formatSqlQuery = (query: string) => {
+    if (!query || query.trim() === '') {
+      return '';
+    }
+    try {
+      return sqlFormat(query, {
+        language: 'mysql',
+        tabWidth: 2,
+        keywordCase: 'upper',
+        linesBetweenQueries: 2,
+        indentStyle: 'standard'
+      });
+    } catch (error) {
+      console.error('SQL formatting error:', error);
+      return query;
+    }
+  };
+  
   const renderToolArgs = () => {
     if (toolName === "sql_db_query" && typeof argsText === "string") {
       try {
         const argsObj = JSON.parse(argsText);
         if (argsObj.query) {
+          // Format the SQL query for better readability
+          const formattedQuery = formatSqlQuery(argsObj.query);
+          
           return (
             <div className="mt-2 relative">
               <div className="absolute top-2 right-2 z-10">
@@ -83,7 +103,7 @@ export const ToolFallback: ToolCallContentPartComponent = ({
                   paddingRight: '40px', // Make room for the copy button
                 }}
               >
-                {argsObj.query}
+                {formattedQuery}
               </SyntaxHighlighter>
             </div>
           );
