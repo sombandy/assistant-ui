@@ -13,35 +13,19 @@ export const ToolFallback: ToolCallContentPartComponent = ({
   argsText,
   result,
 }) => {
-  // Detect if the user prefers dark mode
   const [isDarkMode, setIsDarkMode] = useState(false);
-  // State for collapsible display
   const [isCollapsed, setIsCollapsed] = useState(true);
   
   useEffect(() => {
-    // Check if the document has a 'dark' class on html or body
-    const isDark = document.documentElement.classList.contains('dark') || 
-                   document.body.classList.contains('dark');
-    setIsDarkMode(isDark);
+    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    setIsDarkMode(darkModeMediaQuery.matches);
     
-    // Optional: Listen for changes in theme
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.attributeName === 'class') {
-          const isDark = document.documentElement.classList.contains('dark') || 
-                         document.body.classList.contains('dark');
-          setIsDarkMode(isDark);
-        }
-      });
-    });
+    const handler = (e) => setIsDarkMode(e.matches);
+    darkModeMediaQuery.addEventListener('change', handler);
     
-    observer.observe(document.documentElement, { attributes: true });
-    observer.observe(document.body, { attributes: true });
-    
-    return () => observer.disconnect();
+    return () => darkModeMediaQuery.removeEventListener('change', handler);
   }, []);
 
-  // Copy to clipboard function
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -54,6 +38,13 @@ export const ToolFallback: ToolCallContentPartComponent = ({
     if (!query || query.trim() === '') {
       return '';
     }
+
+    if (query.includes("'http") || query.includes("'https")) {
+      return query.split('\n')
+        .map(line => line.trim())
+        .join('\n');
+    }
+
     try {
       return sqlFormat(query, {
         language: 'mysql',
