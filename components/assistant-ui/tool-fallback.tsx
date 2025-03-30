@@ -5,6 +5,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneLight, oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
+import { marked } from "marked";
 
 export const ToolFallback: ToolCallContentPartComponent = ({
   toolName,
@@ -96,9 +97,206 @@ export const ToolFallback: ToolCallContentPartComponent = ({
     );
   };
 
+  // Generate HTML table directly
+  const generateHtmlTable = (rows: string[][]) => {
+    // Add custom CSS to ensure tables stay within boundaries
+    const customStyles = `
+      <style>
+        .sql-result-table {
+          border-collapse: collapse;
+          width: auto;
+          min-width: 100%;
+          table-layout: auto;
+          margin-top: 0;
+          margin-bottom: 0;
+        }
+        .sql-result-table td {
+          border: 1px solid var(--border, #e5e5e5);
+          padding: 10px 16px;
+          text-align: left;
+          white-space: nowrap;
+        }
+      </style>
+    `;
+    
+    let tableHtml = '<table class="sql-result-table">';
+    
+    // Add rows
+    rows.forEach(row => {
+      tableHtml += '<tr>';
+      row.forEach(cell => {
+        tableHtml += `<td>${cell}</td>`;
+      });
+      tableHtml += '</tr>';
+    });
+    
+    tableHtml += '</table>';
+    
+    return customStyles + tableHtml;
+  };
+
   // Format the result
   const renderResult = () => {
     if (typeof result === "string") {
+      // Try to detect if the result is a list of tuples (like Python list output)
+      if (result.trim().startsWith("[") && result.trim().endsWith("]") && result.includes("(")) {
+        try {
+          // Extract the content between the outer brackets
+          const listContent = result.trim().substring(1, result.trim().length - 1).trim();
+          
+          // Better regex to extract tuples, handling nested parentheses and quotes
+          const rows = [];
+          let depth = 0;
+          let currentTuple = "";
+          let inQuote = false;
+          let quoteChar = null;
+          
+          for (let i = 0; i < listContent.length; i++) {
+            const char = listContent[i];
+            
+            // Handle quotes
+            if ((char === '"' || char === "'") && (i === 0 || listContent[i-1] !== '\\')) {
+              if (!inQuote) {
+                inQuote = true;
+                quoteChar = char;
+              } else if (char === quoteChar) {
+                inQuote = false;
+                quoteChar = null;
+              }
+            }
+            
+            // Only count parentheses if not in a quote
+            if (!inQuote) {
+              if (char === '(') {
+                depth++;
+                if (depth === 1) {
+                  currentTuple = "";
+                  continue; // Skip the opening parenthesis
+                }
+              } else if (char === ')') {
+                depth--;
+                if (depth === 0) {
+                  rows.push(currentTuple.trim());
+                  // Skip until we find the next tuple
+                  while (i < listContent.length && listContent[i] !== '(') {
+                    i++;
+                  }
+                  i--; // Adjust for the next iteration
+                  continue;
+                }
+              }
+            }
+            
+            if (depth > 0) {
+              currentTuple += char;
+            }
+          }
+          
+          if (rows.length > 0) {
+            // Parse the first row to determine columns
+            const parseRow = (rowStr: string) => {
+              const values = [];
+              let currentValue = "";
+              let inQuote = false;
+              let quoteChar = null;
+              
+              for (let i = 0; i < rowStr.length; i++) {
+                const char = rowStr[i];
+                
+                // Handle quotes
+                if ((char === '"' || char === "'") && (i === 0 || rowStr[i-1] !== '\\')) {
+                  if (!inQuote) {
+                    inQuote = true;
+                    quoteChar = char;
+                    continue; // Skip the opening quote
+                  } else if (char === quoteChar) {
+                    inQuote = false;
+                    quoteChar = null;
+                    continue; // Skip the closing quote
+                  }
+                }
+                
+                // Handle commas as separators, but only if not in quotes
+                if (char === ',' && !inQuote) {
+                  values.push(currentValue.trim());
+                  currentValue = "";
+                  continue;
+                }
+                
+                currentValue += char;
+              }
+              
+              // Add the last value
+              if (currentValue.trim()) {
+                values.push(currentValue.trim());
+              }
+              
+              return values;
+            };
+            
+            // Helper function to process datetime.date objects
+            const processDatetime = (values: string[]) => {
+              const processed = [];
+              let i = 0;
+              
+              while (i < values.length) {
+                let value = values[i];
+                
+                // Check if this is the start of a datetime.date
+                if (value.includes("datetime.date")) {
+                  // Collect the next values that are part of the date
+                  let dateStr = value;
+                  let j = i + 1;
+                  
+                  // Look ahead for date components
+                  while (j < values.length && !isNaN(Number(values[j]))) {
+                    dateStr += "-" + values[j];
+                    j++;
+                  }
+                  
+                  // Replace datetime.date with a formatted date
+                  const dateMatch = dateStr.match(/datetime\.date\((\d+),\s*(\d+),\s*(\d+)\)/);
+                  if (dateMatch) {
+                    processed.push(`${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`);
+                  } else {
+                    // Try another format
+                    const simpleDateMatch = dateStr.match(/datetime\.date\((\d+)-(\d+)-(\d+)\)/);
+                    if (simpleDateMatch) {
+                      processed.push(`${simpleDateMatch[1]}-${simpleDateMatch[2]}-${simpleDateMatch[3]}`);
+                    } else {
+                      // If we can't parse it, just add the original string
+                      processed.push(dateStr);
+                    }
+                  }
+                  
+                  // Skip the values we've processed
+                  i = j;
+                } else {
+                  processed.push(value);
+                  i++;
+                }
+              }
+              
+              return processed;
+            };
+            
+            const columns = parseRow(rows[0]);
+            
+            // Parse all rows and process datetime values
+            const tableRows = rows.map(row => {
+              const parsedRow = parseRow(row);
+              return processDatetime(parsedRow);
+            });
+            
+            // Generate HTML table directly
+            return generateHtmlTable(tableRows);
+          }
+        } catch (e) {
+          // If parsing fails, fall back to default rendering
+          console.error('Failed to parse tuples:', e);
+        }
+      }
+      
       return result;
     } else {
       return JSON.stringify(result, null, 2);
@@ -127,11 +325,18 @@ export const ToolFallback: ToolCallContentPartComponent = ({
             {result !== undefined && (
               <div className="border-t border-dashed px-4 pt-2">
                 <p className="font-semibold">Result:</p>
-                <pre className="whitespace-pre-wrap">
-                  {typeof result === "string"
-                    ? result
-                    : JSON.stringify(result, null, 2)}
-                </pre>
+                <div className="whitespace-pre-wrap">
+                  {/* Use dangerouslySetInnerHTML for markdown tables */}
+                  <div 
+                    className="overflow-x-auto overflow-y-auto max-w-full" 
+                    style={{ maxHeight: '400px' }} 
+                    dangerouslySetInnerHTML={{ __html: 
+                      typeof result === "string"
+                        ? renderResult()
+                        : JSON.stringify(result, null, 2)
+                    }} 
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -159,14 +364,17 @@ export const ToolFallback: ToolCallContentPartComponent = ({
       {/* Tool Result Card */}
       {result !== undefined && (
         <Card className="w-full">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Result:</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <pre className="whitespace-pre-wrap text-sm">
-              {renderResult()}
-            </pre>
-          </CardContent>
+          <div className="p-4 pb-0">
+            <div className="text-sm font-medium">Result:</div>
+          </div>
+          <div className="px-4 pt-1">
+            {/* Use dangerouslySetInnerHTML for markdown tables */}
+            <div 
+              className="overflow-x-auto overflow-y-auto max-w-full" 
+              style={{ maxHeight: '400px' }} 
+              dangerouslySetInnerHTML={{ __html: renderResult() }} 
+            />
+          </div>
         </Card>
       )}
     </div>
