@@ -135,9 +135,19 @@ export const ToolFallback: ToolCallContentPartComponent = ({
     return customStyles + tableHtml;
   };
 
+  // Check if the result is an SQL error
+  const isSqlError = (str: string) => {
+    return typeof str === "string" && str.trim().startsWith("Error:");
+  };
+
   // Format the result
   const renderResult = () => {
     if (typeof result === "string") {
+      // Check for SQL errors
+      if (isSqlError(result)) {
+        return "SQL Error";
+      }
+      
       // Try to detect if the result is a list of tuples (like Python list output)
       if (result.trim().startsWith("[") && result.trim().endsWith("]") && result.includes("(")) {
         try {
@@ -303,8 +313,8 @@ export const ToolFallback: ToolCallContentPartComponent = ({
     }
   };
 
-  // For sql_db_schema, use the original single card with collapsible display
-  if (toolName === "sql_db_schema") {
+  // For sql_db_schema or SQL errors, use the single card with collapsible display
+  if (toolName === "sql_db_schema" || (toolName === "sql_db_query" && typeof result === "string" && isSqlError(result))) {
     return (
       <div className="mb-4 flex w-full flex-col gap-3 rounded-lg border py-3">
         <div className="flex items-center gap-2 px-4">
@@ -364,9 +374,7 @@ export const ToolFallback: ToolCallContentPartComponent = ({
       {/* Tool Result Card */}
       {result !== undefined && (
         <Card className="w-full">
-          <div className="p-4 pb-0">
-            <div className="text-sm font-medium">Result:</div>
-          </div>
+          {/* No header for SQL query results */}
           <div className="px-4 pt-1">
             {/* Use dangerouslySetInnerHTML for markdown tables */}
             <div 
