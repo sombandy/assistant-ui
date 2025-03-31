@@ -1,4 +1,4 @@
-import { Client, ThreadState } from "@langchain/langgraph-sdk";
+import { Client, Thread, ThreadState } from "@langchain/langgraph-sdk";
 import {
   LangChainMessage,
   LangGraphCommand,
@@ -44,4 +44,20 @@ export const sendMessage = async (params: {
       streamMode: ["messages", "updates"],
     }
   );
+};
+
+export const getThreads = async (): Promise<Thread[]> => {
+  const client = createClient();
+  const assistantId = process.env["NEXT_PUBLIC_LANGGRAPH_ASSISTANT_ID"]!;
+  
+  try {
+    const threads = await client.threads.search({
+      metadata: { graph_id: assistantId },
+      limit: 100,
+    });
+    return threads;
+  } catch (error) {
+    console.error("Error fetching threads:", error);
+    return [];
+  }
 };
