@@ -5,7 +5,6 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneLight, oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
-import { marked } from "marked";
 import { format as sqlFormat } from "sql-formatter";
 
 export const ToolFallback: ToolCallContentPartComponent = ({
@@ -20,7 +19,7 @@ export const ToolFallback: ToolCallContentPartComponent = ({
     const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     setIsDarkMode(darkModeMediaQuery.matches);
     
-    const handler = (e) => setIsDarkMode(e.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDarkMode(e.matches);
     darkModeMediaQuery.addEventListener('change', handler);
     
     return () => darkModeMediaQuery.removeEventListener('change', handler);
@@ -54,7 +53,7 @@ export const ToolFallback: ToolCallContentPartComponent = ({
         indentStyle: 'standard'
       });
     } catch (error) {
-      console.error('SQL formatting error:', error);
+      console.error('SQL formatting error:', (error as Error).message, query);
       return query;
     }
   };

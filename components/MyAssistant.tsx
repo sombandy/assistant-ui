@@ -43,11 +43,9 @@ export function MyAssistant() {
     <ThreadProvider>
       <AssistantRuntimeProvider runtime={runtime}>
         <div className="flex h-screen w-full">
-          {/* Thread List Sidebar */}
           <div 
             className={`${sidebarOpen ? 'w-64' : 'w-0'} border-r border-gray-200 h-full transition-all duration-300 overflow-hidden relative`}
           >
-            {/* Toggle Sidebar Button - Now inside the sidebar */}
             <button 
               className="absolute top-[18px] left-4 z-10 p-1.5 rounded-md hover:bg-gray-100 transition-colors"
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -59,9 +57,7 @@ export function MyAssistant() {
             <ThreadList toggleSidebar={() => setSidebarOpen(!sidebarOpen)} sidebarOpen={sidebarOpen} />
           </div>
           
-          {/* Main Chat Area */}
           <div className="flex-1 relative">
-            {/* Only show this button when sidebar is collapsed */}
             {!sidebarOpen && (
               <button 
                 className="absolute top-4 left-4 z-10 p-1.5 rounded-md hover:bg-gray-100 transition-colors"
@@ -72,7 +68,6 @@ export function MyAssistant() {
               </button>
             )}
             
-            {/* New Thread Button - Now in the chat area */}
             <button 
               className="absolute top-4 right-4 z-10 p-1.5 rounded-md hover:bg-gray-100 transition-colors"
               onClick={async () => {

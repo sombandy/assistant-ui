@@ -75,16 +75,13 @@ export const ThreadList: FC<ThreadListProps> = ({ toggleSidebar, sidebarOpen }) 
 
   return (
     <div className="flex flex-col h-full">
-      {/* Thread List Header */}
       <div className="h-[60px] border-b border-gray-200 flex items-center justify-center">
         <h2 className="font-medium text-sm">Thread History</h2>
       </div>
       
-      {/* Thread List Items */}
       <div className="flex-1 overflow-y-auto">
         <ThreadListItems threads={threads} />
         
-        {/* Loading overlay */}
         {threadsLoading && (
           <div className="absolute inset-0 bg-background/50 flex justify-center items-center">
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
@@ -94,8 +91,6 @@ export const ThreadList: FC<ThreadListProps> = ({ toggleSidebar, sidebarOpen }) 
     </div>
   );
 };
-
-// ThreadListNew component is now integrated into the main ThreadList component
 
 const ThreadListItems: FC<{ threads: any[] }> = ({ threads }) => {
   const runtime = useAssistantRuntime();
@@ -110,14 +105,11 @@ const ThreadListItems: FC<{ threads: any[] }> = ({ threads }) => {
   }
   
   const handleThreadClick = async (threadId: string) => {
-    // Update the active thread ID in the provider
     setActiveThreadId(threadId);
     
     try {
-      // Switch to the selected thread
-      await runtime.switchToThread(threadId);
+      await runtime.threads.switchToThread(threadId);
       
-      // Refresh the thread list to update any changes
       fetchThreads().catch(console.error);
     } catch (error) {
       console.error("Error switching to thread:", error);
@@ -139,13 +131,10 @@ const ThreadListItems: FC<{ threads: any[] }> = ({ threads }) => {
 };
 
 const ThreadListItem: FC<{ thread: any; onClick: () => void; active: boolean }> = ({ thread, onClick, active }) => {
-  // State to hold the formatted creation time
   const [creationTime, setCreationTime] = useState<string>("");
   
-  // Get the title from the first message if available
   let title = "New Chat";
   
-  // Extract the first message text content for the thread title
   if (
     typeof thread.values === "object" &&
     thread.values &&
@@ -154,35 +143,21 @@ const ThreadListItem: FC<{ thread: any; onClick: () => void; active: boolean }> 
     thread.values.messages?.length > 0
   ) {
     const messages = thread.values.messages;
+    const firstMessage = messages[0];
     
-    // Find the first human message (usually the query)
-    const humanMessage = messages.find((msg: any) => msg.type === "human");
-    const firstMessage = humanMessage || messages[0];
-    
-    // Handle different message content formats
     if (firstMessage) {
-      if (firstMessage.content && Array.isArray(firstMessage.content)) {
-        // Handle array content format (e.g., [{type: 'text', text: '...'}])
-        const textContent = firstMessage.content.find((c: any) => c.type === "text");
-        if (textContent && textContent.text) {
-          title = textContent.text;
-        }
-      } else if (typeof firstMessage.content === "string") {
-        // Handle string content format
+      if (typeof firstMessage.content === "string") {
         title = firstMessage.content;
       } else if (firstMessage.text) {
-        // Handle direct text property
         title = firstMessage.text;
       }
       
-      // Truncate long titles
       if (title.length > 40) {
         title = title.substring(0, 40) + "...";
       }
     }
   }
 
-  // Fetch and set the creation time when the component mounts
   useEffect(() => {
     let isMounted = true;
     

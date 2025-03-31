@@ -29,7 +29,7 @@ export const Thread: FC = () => {
     <ThreadPrimitive.Root
       className="bg-background box-border h-full"
       style={{
-        ["--thread-max-width" as string]: "42rem",
+        ["--thread-max-width" as string]: "54rem",
       }}
     >
       <ThreadPrimitive.Viewport className="flex h-full flex-col items-center overflow-y-scroll scroll-smooth bg-inherit px-4 pt-8">
