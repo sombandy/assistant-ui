@@ -1,85 +1,39 @@
 import { FC, useEffect, useState } from "react";
-import {
-  ThreadListItemPrimitive,
-  ThreadListPrimitive,
-} from "@assistant-ui/react";
-import { ArchiveIcon, PlusIcon, Loader2, FileEditIcon } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useThreads } from "@/providers/ThreadProvider";
 import { useAssistantRuntime } from "@assistant-ui/react";
-import { format, parseISO, isValid } from "date-fns";
+import { format } from "date-fns";
 
-import { Button } from "@/components/ui/button";
-import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
+import { getThreadCreationDate } from "@/lib/chatApi";
 
-// Helper function to extract and format the creation time from thread data
-const getThreadCreationTime = (thread: any): string => {
+// Cache for formatted thread creation times to avoid reformatting
+const formattedTimeCache = new Map<string, string>();
+
+/**
+ * Gets the formatted creation time of a thread
+ * @param thread The thread object
+ * @returns A formatted string representing the thread creation time
+ */
+const getFormattedThreadCreationTime = async (thread: any): Promise<string> => {
   try {
-    // First check if the thread has creation_time in its metadata
-    if (thread.metadata && thread.metadata.creation_time) {
-      const creationTime = thread.metadata.creation_time;
-      if (typeof creationTime === 'string') {
-        // Try to parse as ISO string
-        const date = parseISO(creationTime);
-        if (isValid(date)) {
-          return format(date, 'MMM d, yyyy h:mm a');
-        }
-      } else if (typeof creationTime === 'number') {
-        // Handle numeric timestamp (seconds or milliseconds)
-        const date = new Date(creationTime > 1000000000000 ? creationTime : creationTime * 1000);
-        if (isValid(date)) {
-          return format(date, 'MMM d, yyyy h:mm a');
-        }
-      }
-    }
-    
-    // If no metadata or invalid metadata, try to extract from thread ID
     const threadId = thread.thread_id;
     
-    // Try to extract a timestamp if the thread ID contains one
-    const timestampMatch = threadId.match(/\d{10,}/);
-    if (timestampMatch) {
-      const timestamp = parseInt(timestampMatch[0]);
-      // Check if it's a valid timestamp (in milliseconds or seconds)
-      let date;
-      if (timestamp > 1000000000000) {
-        // Milliseconds timestamp
-        date = new Date(timestamp);
-      } else {
-        // Seconds timestamp
-        date = new Date(timestamp * 1000);
-      }
-      
-      if (isValid(date)) {
-        return format(date, 'MMM d, yyyy h:mm a');
-      }
+    // Check if we already have the formatted time in cache
+    if (formattedTimeCache.has(threadId)) {
+      return formattedTimeCache.get(threadId)!;
     }
     
-    // If we can't extract a timestamp, try to parse the thread ID as an ISO date
-    if (threadId.includes('T') && threadId.includes('-')) {
-      const date = parseISO(threadId);
-      if (isValid(date)) {
-        return format(date, 'MMM d, yyyy h:mm a');
-      }
-    }
+    // Get the creation date using the shared function
+    const creationDate = await getThreadCreationDate(threadId);
     
-    // Last resort: check if there's a timestamp in the messages
-    if (thread.values && thread.values.messages && thread.values.messages.length > 0) {
-      const firstMessage = thread.values.messages[0];
-      if (firstMessage.created_at) {
-        const date = typeof firstMessage.created_at === 'string' 
-          ? parseISO(firstMessage.created_at)
-          : new Date(firstMessage.created_at > 1000000000000 ? firstMessage.created_at : firstMessage.created_at * 1000);
-        
-        if (isValid(date)) {
-          return format(date, 'MMM d, yyyy h:mm a');
-        }
-      }
-    }
+    // Format the date
+    const formattedDate = format(creationDate, 'MMM d, yyyy h:mm a');
     
-    // Fallback to showing today's date and time
-    return format(new Date(), 'MMM d, yyyy h:mm a');
+    // Cache the formatted result
+    formattedTimeCache.set(threadId, formattedDate);
+    return formattedDate;
   } catch (error) {
-    console.error("Error parsing thread creation time:", error);
+    console.error("Error formatting thread creation time:", error);
     return format(new Date(), 'MMM d, yyyy h:mm a');
   }
 };
@@ -185,6 +139,9 @@ const ThreadListItems: FC<{ threads: any[] }> = ({ threads }) => {
 };
 
 const ThreadListItem: FC<{ thread: any; onClick: () => void; active: boolean }> = ({ thread, onClick, active }) => {
+  // State to hold the formatted creation time
+  const [creationTime, setCreationTime] = useState<string>("");
+  
   // Get the title from the first message if available
   let title = "New Chat";
   
@@ -225,6 +182,28 @@ const ThreadListItem: FC<{ thread: any; onClick: () => void; active: boolean }> 
     }
   }
 
+  // Fetch and set the creation time when the component mounts
+  useEffect(() => {
+    let isMounted = true;
+    
+    const fetchCreationTime = async () => {
+      try {
+        const time = await getFormattedThreadCreationTime(thread);
+        if (isMounted) {
+          setCreationTime(time);
+        }
+      } catch (error) {
+        console.error("Error fetching thread creation time:", error);
+      }
+    };
+    
+    fetchCreationTime();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [thread]);
+
   return (
     <div 
       className={`flex items-center gap-2 rounded-lg transition-all hover:bg-muted focus-visible:outline-none focus-visible:ring-2 ${active ? "bg-muted" : ""}`}
@@ -233,7 +212,7 @@ const ThreadListItem: FC<{ thread: any; onClick: () => void; active: boolean }> 
       <button className="flex-grow px-3 py-2 text-start text-sm w-full">
         <p className="truncate text-ellipsis">{title}</p>
         <p className="text-xs text-muted-foreground truncate">
-          {getThreadCreationTime(thread)}
+          {creationTime || "Loading..."}
         </p>
       </button>
     </div>

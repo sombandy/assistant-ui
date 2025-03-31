@@ -2,7 +2,7 @@
 
 import { Thread } from "@langchain/langgraph-sdk";
 import { createContext, useContext, ReactNode, useCallback, useState, Dispatch, SetStateAction } from "react";
-import { getThreads } from "@/lib/chatApi";
+import { getThreads, getThreadCreationDate } from "@/lib/chatApi";
 
 interface ThreadContextType {
   fetchThreads: () => Promise<Thread[]>;
@@ -21,19 +21,27 @@ export function ThreadProvider({ children }: { children: ReactNode }) {
   const [threadsLoading, setThreadsLoading] = useState(false);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
 
-  // Enhanced fetchThreads that also updates the active thread if needed
+  // No need for local state since caching is handled in the API layer
+
   const fetchThreads = useCallback(async (): Promise<Thread[]> => {
     try {
       const fetchedThreads = await getThreads();
       
-      // Sort threads by most recent first (assuming thread_id contains timestamp info)
-      const sortedThreads = [...fetchedThreads].sort((a, b) => {
-        return b.thread_id.localeCompare(a.thread_id);
+      // Get creation times for all threads using the shared function
+      const threadCreationPromises = fetchedThreads.map(async (thread) => {
+        const creationTime = await getThreadCreationDate(thread.thread_id);
+        return { thread, creationTime };
       });
+      
+      const threadsWithTimes = await Promise.all(threadCreationPromises);
+      
+      // Sort threads by creation time (newest first)
+      const sortedThreads = threadsWithTimes
+        .sort((a, b) => b.creationTime.getTime() - a.creationTime.getTime())
+        .map(item => item.thread);
       
       setThreads(sortedThreads);
       
-      // If we have threads but no active thread, set the most recent one as active
       if (sortedThreads.length > 0 && !activeThreadId) {
         setActiveThreadId(sortedThreads[0].thread_id);
       }
