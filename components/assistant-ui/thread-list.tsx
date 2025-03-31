@@ -3,7 +3,7 @@ import {
   ThreadListItemPrimitive,
   ThreadListPrimitive,
 } from "@assistant-ui/react";
-import { ArchiveIcon, PlusIcon, Loader2 } from "lucide-react";
+import { ArchiveIcon, PlusIcon, Loader2, FileEditIcon } from "lucide-react";
 import { useThreads } from "@/providers/ThreadProvider";
 import { useAssistantRuntime } from "@assistant-ui/react";
 import { format, parseISO, isValid } from "date-fns";
@@ -84,7 +84,12 @@ const getThreadCreationTime = (thread: any): string => {
   }
 };
 
-export const ThreadList: FC = () => {
+interface ThreadListProps {
+  toggleSidebar?: () => void;
+  sidebarOpen?: boolean;
+}
+
+export const ThreadList: FC<ThreadListProps> = ({ toggleSidebar, sidebarOpen }) => {
   const { fetchThreads, threads, threadsLoading, setThreadsLoading } = useThreads();
   const runtime = useAssistantRuntime();
   
@@ -111,54 +116,32 @@ export const ThreadList: FC = () => {
       fetchThreads().catch(console.error);
     }
   }, [runtime.thread, fetchThreads]);
+  
+  // We've moved the new thread functionality to the MyAssistant component
 
   return (
-    <ThreadListPrimitive.Root className="flex flex-col items-stretch gap-1.5 h-full overflow-y-auto relative">
-      <ThreadListNew />
-      <ThreadListItems threads={threads} />
+    <div className="flex flex-col h-full">
+      {/* Thread List Header */}
+      <div className="h-[60px] border-b border-gray-200 flex items-center justify-center">
+        <h2 className="font-medium text-sm">Thread History</h2>
+      </div>
       
-      {/* Loading overlay */}
-      {threadsLoading && (
-        <div className="absolute inset-0 bg-background/50 flex justify-center items-center">
-          <Loader2 className="h-5 w-5 animate-spin text-primary" />
-        </div>
-      )}
-    </ThreadListPrimitive.Root>
+      {/* Thread List Items */}
+      <div className="flex-1 overflow-y-auto">
+        <ThreadListItems threads={threads} />
+        
+        {/* Loading overlay */}
+        {threadsLoading && (
+          <div className="absolute inset-0 bg-background/50 flex justify-center items-center">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
-const ThreadListNew: FC = () => {
-  const runtime = useAssistantRuntime();
-  const { fetchThreads, setActiveThreadId } = useThreads();
-  
-  const handleNewThread = async () => {
-    try {
-      // Switch to a new thread using the runtime
-      await runtime.switchToNewThread();
-      
-      // Refresh the thread list to show the new thread
-      const updatedThreads = await fetchThreads();
-      
-      // Set the newly created thread as active (it should be the first one after sorting)
-      if (updatedThreads.length > 0) {
-        setActiveThreadId(updatedThreads[0].thread_id);
-      }
-    } catch (error) {
-      console.error("Error creating new thread:", error);
-    }
-  };
-  
-  return (
-    <Button 
-      className="data-[active]:bg-muted hover:bg-muted flex items-center justify-start gap-1 rounded-lg px-2.5 py-2 text-start" 
-      variant="ghost"
-      onClick={handleNewThread}
-    >
-      <PlusIcon />
-      New Thread
-    </Button>
-  );
-};
+// ThreadListNew component is now integrated into the main ThreadList component
 
 const ThreadListItems: FC<{ threads: any[] }> = ({ threads }) => {
   const runtime = useAssistantRuntime();
