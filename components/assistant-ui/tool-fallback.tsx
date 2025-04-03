@@ -88,9 +88,12 @@ export const ToolFallback: ToolCallContentPartComponent = ({
                   borderRadius: '0.375rem',
                   fontSize: '0.875rem',
                   margin: 0,
-                  backgroundColor: 'var(--background-muted, #f5f5f5)',
+                  backgroundColor: isDarkMode ? 'var(--background-muted, #1e1e1e)' : 'var(--background-muted, #f5f5f5)',
                   border: '1px solid var(--border, #e5e5e5)',
                   paddingRight: '40px', // Make room for the copy button
+                }}
+                codeTagProps={{
+                  style: isDarkMode ? { color: 'var(--foreground, #ffffff)' } : undefined
                 }}
               >
                 {formattedQuery}
@@ -150,12 +153,81 @@ export const ToolFallback: ToolCallContentPartComponent = ({
     return typeof str === "string" && str.trim().startsWith("Error:");
   };
 
+  // Check if a string might be JSON
+  const isJsonString = (str: string) => {
+    try {
+      const json = JSON.parse(str);
+      return typeof json === 'object' && json !== null;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  // Format JSON with syntax highlighting
+  const formatJson = (data: any) => {
+    if (typeof data === 'string') {
+      try {
+        // Try to parse it if it's a string
+        data = JSON.parse(data);
+      } catch (e) {
+        // If it's not valid JSON, return as is
+        return data;
+      }
+    }
+    return JSON.stringify(data, null, 2);
+  };
+
   // Format the result
   const renderResult = () => {
     if (typeof result === "string") {
       // Check for SQL errors
       if (isSqlError(result)) {
         return "SQL Error";
+      }
+      
+      // Check if the string is JSON
+      if (isJsonString(result)) {
+        try {
+          const jsonData = JSON.parse(result);
+          const formattedJson = formatJson(jsonData);
+          
+          return (
+            <div className="mt-2 relative">
+              <div className="absolute top-2 right-2 z-10">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 bg-background/80 hover:bg-background/90 backdrop-blur"
+                  onClick={() => copyToClipboard(typeof result === 'string' ? result : JSON.stringify(jsonData))}
+                  title="Copy JSON"
+                >
+                  {copied ? 
+                    <CheckCheckIcon className="h-4 w-4 text-green-500" /> : 
+                    <CopyIcon className="h-4 w-4" />}
+                </Button>
+              </div>
+              <SyntaxHighlighter 
+                language="json"
+                style={isDarkMode ? oneDark : oneLight}
+                customStyle={{
+                  borderRadius: '0.375rem',
+                  fontSize: '0.875rem',
+                  margin: 0,
+                  backgroundColor: isDarkMode ? 'var(--background-muted, #1e1e1e)' : 'var(--background-muted, #f5f5f5)',
+                  border: '1px solid var(--border, #e5e5e5)',
+                  paddingRight: '40px', // Make room for the copy button
+                }}
+                codeTagProps={{
+                  style: isDarkMode ? { color: 'var(--foreground, #ffffff)' } : undefined
+                }}
+              >
+                {formattedJson}
+              </SyntaxHighlighter>
+            </div>
+          );
+        } catch (e) {
+          console.error('Failed to parse JSON:', e);
+        }
       }
       
       // Try to detect if the result is a list of tuples (like Python list output)
@@ -318,8 +390,45 @@ export const ToolFallback: ToolCallContentPartComponent = ({
       }
       
       return result;
+    } else if (typeof result === 'object' && result !== null) {
+      const formattedJson = formatJson(result);
+      
+      return (
+        <div className="mt-2 relative">
+          <div className="absolute top-2 right-2 z-10">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 bg-background/80 hover:bg-background/90 backdrop-blur"
+              onClick={() => copyToClipboard(JSON.stringify(result))}
+              title="Copy JSON"
+            >
+              {copied ? 
+                <CheckCheckIcon className="h-4 w-4 text-green-500" /> : 
+                <CopyIcon className="h-4 w-4" />}
+            </Button>
+          </div>
+          <SyntaxHighlighter 
+            language="json"
+            style={isDarkMode ? oneDark : oneLight}
+            customStyle={{
+              borderRadius: '0.375rem',
+              fontSize: '0.875rem',
+              margin: 0,
+              backgroundColor: isDarkMode ? 'var(--background-muted, #1e1e1e)' : 'var(--background-muted, #f5f5f5)',
+              border: '1px solid var(--border, #e5e5e5)',
+              paddingRight: '40px', // Make room for the copy button
+            }}
+            codeTagProps={{
+              style: isDarkMode ? { color: 'var(--foreground, #ffffff)' } : undefined
+            }}
+          >
+            {formattedJson}
+          </SyntaxHighlighter>
+        </div>
+      );
     } else {
-      return JSON.stringify(result, null, 2);
+      return String(result);
     }
   };
 
@@ -349,13 +458,14 @@ export const ToolFallback: ToolCallContentPartComponent = ({
                   {/* Use dangerouslySetInnerHTML for markdown tables */}
                   <div 
                     className="overflow-x-auto overflow-y-auto max-w-full" 
-                    style={{ maxHeight: '400px' }} 
-                    dangerouslySetInnerHTML={{ __html: 
-                      typeof result === "string"
-                        ? renderResult()
-                        : JSON.stringify(result, null, 2)
-                    }} 
-                  />
+                    style={{ maxHeight: '400px' }}
+                  >
+                    {typeof result === "string" && !isJsonString(result) ? (
+                      <div dangerouslySetInnerHTML={{ __html: renderResult() }} />
+                    ) : (
+                      renderResult()
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -389,9 +499,14 @@ export const ToolFallback: ToolCallContentPartComponent = ({
             {/* Use dangerouslySetInnerHTML for markdown tables */}
             <div 
               className="overflow-x-auto overflow-y-auto max-w-full" 
-              style={{ maxHeight: '400px' }} 
-              dangerouslySetInnerHTML={{ __html: renderResult() }} 
-            />
+              style={{ maxHeight: '400px' }}
+            >
+              {typeof result === "string" && !isJsonString(result) ? (
+                <div dangerouslySetInnerHTML={{ __html: renderResult() }} />
+              ) : (
+                renderResult()
+              )}
+            </div>
           </div>
         </Card>
       )}
