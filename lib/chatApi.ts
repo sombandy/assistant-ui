@@ -50,7 +50,7 @@ export const sendMessage = async (params: {
     {
       input: params.messages?.length
         ? {
-            messages: params.messages,
+            messages: params.messages.filter(message => message.type === "human"),
           }
         : null,
       command: params.command,
